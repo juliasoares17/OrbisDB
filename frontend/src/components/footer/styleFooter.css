@@ -1,0 +1,93 @@
+.footer {
+    background-color: #0a171e;  
+    position: relative; 
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: fit-content;   
+    width: 100%;           
+    display: flex;        
+    flex-direction: column; 
+    justify-content: center; 
+    color: white;          
+}
+
+.footer_interno{
+    padding: 1.5rem;
+}
+
+.logo_footer{
+    width: 22%;
+}
+
+.decorativo {
+color: white;     
+  background-color: white; 
+  margin-bottom: 1.25rem;  
+  height: 0.1rem;          
+  border: none;    
+}
+
+.conteudo_footer{
+    display: flex;             
+    flex-direction: row;      
+    justify-content: flex-start; 
+    gap: 17.8%;    
+}
+
+.descricao_orbis{
+    width: 30%;
+}
+
+.texto_descricao_orbis{
+    text-align: left;
+}
+
+.navegacao_footer{
+    display: flex;
+    flex-direction: column;
+}
+
+.navegacao_footer_titulo{
+    display: flex;
+    flex-direction: column;
+}
+
+.titulo_seção_footer{
+    font-weight: 600;       
+    font-size: 1.5rem;       
+    margin-bottom: 1.25rem;  
+}
+
+.itens_footer_grupo{
+    display: flex;          
+    flex-direction: column; 
+}
+
+.item_footer{
+    display: flex;        
+    flex-direction: row;    
+    align-items: center;     
+    gap: 0.5rem;           
+    text-decoration: none; 
+}
+
+.texto_item_footer{
+    font-size: 1.125rem;
+    text-decoration: none;
+    color: white;
+}
+
+.texto_item_footer:hover {
+    text-decoration: underline; 
+    cursor: pointer; 
+}
+
+.fim_footer {
+    background-color: #081218;  
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+    color: #D6D8E4;
+    display: flex;
+    justify-content: center;
+}

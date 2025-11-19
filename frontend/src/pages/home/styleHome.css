@@ -1,0 +1,10 @@
+.conteudo_home {
+    display: flex;
+    flex-direction: column;
+    margin-top: 13rem;
+    align-items: center;
+}
+
+.texto_inicial_home{
+    text-align: center;
+}

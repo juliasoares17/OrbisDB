@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model continente {
+  id              Int       @id @default(autoincrement())
+  nome            String    @unique @db.VarChar(100)
+  descricao       String    @db.Text
+  area_km2        Decimal?  @db.Decimal(12, 2)
+  numero_paises   Int?
+  populacao_total BigInt?
+  created_at      DateTime? @default(now())
+  updated_at      DateTime? @updatedAt
+
+  paises pais[]
+
+  @@map("continente")
+}
+
+model pais {
+  id              Int       @id @default(autoincrement())
+  id_continente   Int
+  nome            String    @unique @db.VarChar(100)
+  populacao_total BigInt
+  idioma_oficial  String    @db.Text
+  moeda           String    @db.VarChar(50)
+  created_at      DateTime? @default(now())
+  updated_at      DateTime? @updatedAt
+
+  continente continente @relation(fields: [id_continente], references: [id], onDelete: Cascade)
+
+  cidades cidade[]
+
+  @@map("pais")
+}
+
+model cidade {
+  id              Int       @id @default(autoincrement())
+  id_pais         Int     
+  nome            String    @unique @db.VarChar(100)
+  populacao_total Int
+  latitude        Decimal   @db.Decimal(10, 8)
+  longitude       Decimal   @db.Decimal(11, 8)
+  created_at      DateTime? @default(now())
+  updated_at      DateTime? @updatedAt
+
+  pais pais @relation(fields: [id_pais], references: [id], onDelete: Cascade)
+
+  @@map("cidade")
+}
+
+model usuario {
+  id      Int    @id @default(autoincrement())
+  nome    String @db.VarChar(100)
+  email   String @unique @db.VarChar(100)
+  senha   String @db.VarChar(260)
+
+  @@map("usuario")
+}
+
