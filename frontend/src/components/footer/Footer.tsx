@@ -9,7 +9,7 @@ export default function Footer() {
                 <hr className="decorativo"></hr>
                 <div className="conteudo_footer">
                     <div className="descricao_orbis">
-                        <p className="texto_descricao_orbis">Uma solução tecnológica avançada para classificação fiscal. Esta plataforma automatiza a análise de part numbers, gerando descrições detalhadas e classificações NCM precisas que atendem aos rigorosos padrões da Receita Federal. Foi esenvolvido pela Titus Systems em parceria com a Tecsys.</p>
+                        <p className="texto_descricao_orbis">O OrbisDB é uma plataforma especializada no gerenciamento e catalogação de dados geográficos globais. Seu objetivo principal é fornecer uma ferramenta unificada e estruturada para armazenar, consultar e manter informações detalhadas sobre continentes, países e cidades. Ao centralizar dados cruciais, como população, área, clima e detalhes fotográficos, o OrbisDB permite aos usuários ter uma visão organizada e atualizada da distribuição e características do nosso planeta para fins de análise e referência.</p>
                     </div>
                     <div className="navegacao_footer">
                         <h3 className="titulo_seção_footer">Navegação Rápida</h3>

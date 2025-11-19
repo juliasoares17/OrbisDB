@@ -12,7 +12,7 @@ interface Cidade {
     id: number;
     id_pais: number;
     nome: string;
-    // 💡 CORREÇÃO 1: Permite 'null' para refletir a possibilidade de dados não preenchidos (e compatibilidade com '?? null')
+    // Permite 'null' para refletir a possibilidade de dados não preenchidos no DB
     populacao_total: number | null; 
     latitude: number | null;
     longitude: number | null;
@@ -26,7 +26,6 @@ interface Cidade {
 interface CidadeFormData {
     id_pais: number | undefined;
     nome: string;
-    // 💡 CORREÇÃO 2: Mantemos 'undefined' para o formulário, mas na Cidade é 'null'
     populacao_total: number | undefined; 
     latitude: number | undefined;
     longitude: number | undefined;
@@ -50,7 +49,7 @@ interface PhotoData {
     descricao: string;
     fotografo_nome: string;
     fotografo_perfil: string;
-    unsplash_link: string;
+    unsplash_link: string; // Mantido, mas não usado
 }
 
 const API_CIDADES = 'http://localhost:3001/cidades';
@@ -81,11 +80,13 @@ export default function CidadesPage() {
     const [climaVisivelId, setClimaVisivelId] = useState<number | null>(null);
     const [dadosClima, setDadosClima] = useState<ClimaData | null>(null);
     const [climaLoading, setClimaLoading] = useState(false);
+    
+    // VARIÁVEIS DE ESTADO DO MODAL DE SUCESSO
     const [fotoSucesso, setFotoSucesso] = useState<PhotoData | null>(null);
     const [cadastroSucessoNome, setCadastroSucessoNome] = useState<string | null>(null);
     const [fotoLoading, setFotoLoading] = useState(false);
 
-    // --- FUNÇÕES DE BUSCA ---
+    // --- FUNÇÕES DE BUSCA (sem alterações) ---
     const fetchClima = async (cidade: Cidade) => {
         if (climaVisivelId === cidade.id) {
             setClimaVisivelId(null);
@@ -163,7 +164,7 @@ export default function CidadesPage() {
         fetchCidades();
     }, []);
 
-    // --- FUNÇÕES DE MANIPULAÇÃO DE ESTADO ---
+    // --- FUNÇÕES DE MANIPULAÇÃO DE ESTADO (sem alterações) ---
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -217,23 +218,24 @@ export default function CidadesPage() {
         let dataToSend: Partial<Cidade> = {
             id_pais: Number(formData.id_pais),
             nome: formData.nome,
-            // O uso de '?? null' é o que agora é permitido pela interface 'Cidade' atualizada
+            // Converte undefined/vazio do formulário para null para o banco (MySQL)
             populacao_total: formData.populacao_total ?? null, 
             latitude: formData.latitude ?? null,
             longitude: formData.longitude ?? null,
         };
 
-        // Adiciona dados de foto se estivermos atualizando E a cidade já tiver foto
-        if (cidadeToEdit && cidadeToEdit.foto_url) {
-            dataToSend = {
-                ...dataToSend,
-                foto_url: cidadeToEdit.foto_url,
-                foto_descricao: cidadeToEdit.foto_descricao,
-                fotografo_nome: cidadeToEdit.fotografo_nome,
-                fotografo_perfil: cidadeToEdit.fotografo_perfil,
-            };
-        }
+        // 🛑 REMOÇÃO DE LÓGICA 1: Remove a lógica de reaproveitamento de foto para PUT.
+        // O PUT agora não pode modificar campos de foto, a não ser que o backend cuide disso.
+        // Se a cidade já tem foto, ela será mantida pelo backend.
         
+        // Se estiver editando, não enviamos a foto, para evitar conflitos de tipagem.
+        // Assumimos que a foto já está no banco e será mantida pelo PUT, exceto no POST.
+
+        // Limpar o estado do modal antes de iniciar
+        setCadastroSucessoNome(null);
+        setFotoSucesso(null);
+        setFotoLoading(method === 'POST'); // Apenas carregamos a foto no POST
+
         try {
             const response = await fetch(url, {
                 method: method,
@@ -246,21 +248,22 @@ export default function CidadesPage() {
                 throw new Error(errorData.error || `Falha ao ${cidadeToEdit ? 'atualizar' : 'cadastrar'} a cidade.`);
             }
             
+            // Assume que o backend retorna o objeto completo com a relação 'pais'
             let result: Cidade = await response.json();
             
             if (method === 'POST') {
                 
+                // 1. Define o nome para mostrar o modal
                 setCadastroSucessoNome(result.nome); 
-                setFotoSucesso(null); 
-                setFotoLoading(true); 
                 
+                // 2. Busca e Persiste a foto (Mantido, mas simplificado)
                 try {
                     const fotoResponse = await fetch(`${API_FOTOS}?query=${encodeURIComponent(result.nome)}`);
                     
                     if (fotoResponse.ok) {
                         const fotoData: PhotoData = await fotoResponse.json();
                         
-                        // PUT de atualização da foto
+                        // PUT de atualização da foto (Persistindo no banco)
                         await fetch(`${API_CIDADES}/${result.id}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
@@ -272,6 +275,7 @@ export default function CidadesPage() {
                             }),
                         });
 
+                        // Atualiza o objeto 'result' em memória para o state e modal
                         result = {
                             ...result,
                             foto_url: fotoData.url,
@@ -280,17 +284,18 @@ export default function CidadesPage() {
                             fotografo_perfil: fotoData.fotografo_perfil,
                         };
 
-                        setFotoSucesso(fotoData);
+                        setFotoSucesso(fotoData); // Exibe no modal
                     } else {
                         console.warn(`Nenhuma foto encontrada para ${result.nome}.`);
                     }
                 } catch (error) {
                     console.error("Erro ao buscar/persistir foto:", error);
                 } finally {
-                    setFotoLoading(false); 
+                    setFotoLoading(false); // Fim do carregamento, sucesso ou falha
                 }
             }
-
+            
+            // 3. Atualiza a lista de cidades no frontend
             if (method === 'POST') {
                 setCidades(prev => [...prev, result]);
             } else { 
@@ -299,32 +304,42 @@ export default function CidadesPage() {
                 ));
             }
             
+            // 🛑 ALTERAÇÃO DE LÓGICA: Lógica PÓS-PUT
             if (method === 'PUT') {
+                // Define o nome e limpa estados
                 setCadastroSucessoNome(result.nome); 
                 setFotoSucesso(null); 
                 setFotoLoading(false);
 
+                // Reconstroi o objeto fotoSucesso para o modal, SE a cidade tiver uma URL de foto.
                 if (result.foto_url) {
+                    // Mapeia os dados da cidade atualizada para o formato do modal
                     setFotoSucesso({
                         url: result.foto_url,
                         descricao: result.foto_descricao || 'Foto de cidade.',
                         fotografo_nome: result.fotografo_nome || 'Desconhecido',
                         fotografo_perfil: result.fotografo_perfil || '#',
-                        unsplash_link: '#',
+                        unsplash_link: '#', // Não é essencial para o modal, mas mantido
                     });
                 }
             }
+            
+            // Limpa o formulário após a submissão bem-sucedida (o modal cuida da visibilidade)
+            setFormData(INITIAL_FORM_DATA);
+            setCidadeToEdit(null);
             
         } catch (error) {
             console.error(`Erro na operação ${method}:`, error);
             alert(`Erro: ${error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.'}`);
             
+            // Limpa o modal em caso de erro
             setCadastroSucessoNome(null);
             setFotoSucesso(null);
             setFotoLoading(false);
         }
     };
     
+    // --- FUNÇÃO DELETE (sem alterações) ---
     const handleDelete = async (id: number, nome: string) => {
         if (!window.confirm(`Tem certeza que deseja excluir a cidade "${nome}"?`)) return;
 
@@ -350,7 +365,7 @@ export default function CidadesPage() {
         cidade.nome.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    // --- RENDERIZAÇÃO ---
+    // --- RENDERIZAÇÃO (sem alterações estruturais) ---
     return (
         <div className="conteudo_cidades">
             <h1 className='text-3xl font-bold mb-4 text-gray-800'>🏢 Gerenciamento de Cidades</h1>
@@ -582,5 +597,7 @@ export default function CidadesPage() {
                 </div>
             )}
         </div>
+        
+
     );
 }
