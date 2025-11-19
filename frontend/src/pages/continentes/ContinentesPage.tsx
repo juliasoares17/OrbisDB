@@ -1,41 +1,42 @@
 import React, { useState, useEffect, type FormEvent } from 'react';
 import './styleContinentes.css';
+import { SearchBar } from '../../components/searchBar/SearchBar';
 
-interface Continente {
+// Interface que recebe os dados do Back-end (GET)
+interface Continente { 
     id: number;
     nome: string;
     descricao: string;
     area_km2: number | null;
     numero_paises: number | null;
-    // O BigInt do Back-end é recebido como string no Front-end
     populacao_total: string | null; 
-    created_at: string;
-    updated_at: string;
 }
 
-interface ContinenteData {
+interface ContinenteFormData { 
     nome: string;
     descricao: string;
-    area_km2?: number; 
-    numero_paises?: number;
-    populacao_total?: string;
+    area_km2: number | undefined;
+    numero_paises: number | undefined;
+    populacao_total: string | undefined;
 }
-
 const API_URL = 'http://127.0.0.1:3001/continentes';
+
+const INITIAL_FORM_DATA: ContinenteFormData = {
+    nome: '',
+    descricao: '',
+    area_km2: undefined,
+    numero_paises: undefined,
+    populacao_total: undefined,
+};
 
 export default function ContinentesPage() {
     const [isFormVisible, setIsFormVisible] = useState(false);
-    const [continentes, setContinentes] = useState<Continente[]>([]); 
+    const [continentes, setContinentes] = useState<Continente[]>([]);
     const [isLoading, setIsLoading] = useState(true); 
-    const [novoContinente, setNovoContinente] = useState<ContinenteData>({
-        nome: '',
-        descricao: '',
-        area_km2: undefined,
-        numero_paises: undefined,
-        populacao_total: undefined,
-    });
+    const [searchQuery, setSearchQuery] = useState(''); 
+    const [continenteToEdit, setContinenteToEdit] = useState<Continente | null>(null);
+    const [formData, setFormData] = useState<ContinenteFormData>(INITIAL_FORM_DATA);
 
-    // 2. FUNÇÃO DE BUSCA (GET)
     const fetchContinentes = async () => {
         setIsLoading(true);
         try {
@@ -53,127 +54,211 @@ export default function ContinentesPage() {
         }
     };
     
-    // 3. HOOK useEffect: Carrega os dados na montagem
     useEffect(() => {
         fetchContinentes();
-    }, []); // O array vazio [] garante que a função rode apenas uma vez, na montagem do componente
+    }, []);
     
-    // 4. FUNÇÃO DE SUBMISSÃO (CREATE - POST)
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        
+        const isNumericField = ['area_km2', 'numero_paises', 'populacao_total'].includes(name);
+        
+        setFormData(prevData => ({
+            ...prevData,
+            [name]: isNumericField 
+                ? (value === '' ? undefined : Number(value.replace(/\./g, '').replace(/,/g, '.'))) 
+                : value,
+        }));
+    };
+
+    //Prepara o formulário para edição
+    const handleEditClick = (continente: Continente) => {
+        setContinenteToEdit(continente); // Marca o continente para edição
+        // Preenche o formulário com os dados existentes
+        setFormData({
+            nome: continente.nome,
+            descricao: continente.descricao,
+            area_km2: continente.area_km2 ?? undefined,
+            numero_paises: continente.numero_paises ?? undefined,
+            populacao_total: continente.populacao_total ?? undefined,
+        });
+        setIsFormVisible(true); // Exibe o formulário de edição
+    };
+
+    //Lida com o envio (POST para criação, PUT para edição)
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         
+        // Define o método e a URL com base no estado de edição
+        const method = continenteToEdit ? 'PUT' : 'POST';
+        const url = continenteToEdit ? `${API_URL}/${continenteToEdit.id}` : API_URL;
+        const dataToSend = {
+            nome: formData.nome,
+            descricao: formData.descricao,
+            area_km2: formData.area_km2 ?? null,
+            numero_paises: formData.numero_paises ?? null,
+            populacao_total: formData.populacao_total ?? null,
+        };
+        
         try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
+            const response = await fetch(url, {
+                method: method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(novoContinente),
+                body: JSON.stringify(dataToSend),
             });
 
             if (!response.ok) {
                 const errorData = await response.json();
-                alert(`Erro ao criar continente: ${errorData.error || response.statusText}`);
-                return;
+                throw new Error(errorData.message || `Falha ao ${continenteToEdit ? 'atualizar' : 'cadastrar'} o continente.`);
             }
-
-            const data = await response.json();
-            alert(`Continente "${data.nome}" criado com sucesso!`);
             
-            // Ação chave: Recarrega a lista após o sucesso do POST
-            fetchContinentes(); 
+            const result: Continente = await response.json();
             
-            // Limpa o formulário e o esconde
-            setNovoContinente({ nome: '', descricao: '', area_km2: undefined, numero_paises: undefined, populacao_total: undefined });
+            // Atualiza a lista de continentes no Front-end
+            if (method === 'POST') {
+                setContinentes(prev => [...prev, result]);
+                alert(`Continente "${result.nome}" cadastrado com sucesso!`);
+            } else { // PUT
+                setContinentes(prev => prev.map(cont => 
+                    cont.id === result.id ? result : cont // Substitui o continente atualizado
+                ));
+                alert(`Continente "${result.nome}" atualizado com sucesso!`);
+            }
+            
+            // Reseta o estado
+            setFormData(INITIAL_FORM_DATA);
+            setContinenteToEdit(null); 
             setIsFormVisible(false);
-
+            
         } catch (error) {
-            console.error("Erro na requisição:", error);
-            alert("Erro de conexão com o servidor. Verifique se o backend está rodando.");
+            console.error(`Erro na operação ${method}:`, error);
+            alert(`Erro: ${error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.'}`);
         }
     };
 
-    // FUNÇÃO AUXILIAR para formatar números grandes
+    // Função para exclusão 
+    const handleDelete = async (id: number, nome: string) => {
+        if (!window.confirm(`Tem certeza que deseja excluir o continente "${nome}" (ID: ${id})?`)) {
+            return; 
+        }
+    try {
+            const response = await fetch(`${API_URL}/${id}`, {
+                method: 'DELETE', 
+            });
+
+            if (!response.ok) {
+                throw new Error('Falha ao excluir o continente.');
+            }
+
+            // Atualiza a lista local removendo o continente com o ID correspondente
+            setContinentes(prevContinentes => 
+                prevContinentes.filter(cont => cont.id !== id)
+            );
+
+            console.log(`Continente com ID ${id} excluído com sucesso.`);
+            alert(`Continente "${nome}" excluído com sucesso!`);
+
+        } catch (error) {
+            console.error('Erro ao excluir:', error);
+            alert(`Erro ao excluir o continente "${nome}". Verifique o console para mais detalhes.`);
+        }
+    };
+
     const formatNumber = (value: string | number | null) => {
         if (value === null || value === undefined) return 'N/A';
-        // Garante que o número seja tratado como string para BigInt
         const num = typeof value === 'string' ? BigInt(value) : value;
         return num.toLocaleString('pt-BR');
     };
 
-    // RESTO DAS FUNÇÕES (handleInputChange, etc.)
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        const { name, value } = e.target;
-        setNovoContinente(prev => ({
-            ...prev,
-            [name]: (name === 'area_km2' || name === 'numero_paises') 
-                        ? (value ? Number(value) : undefined) 
-                        : value,
-        }));
+    //Lida com a visibilidade do formulário e reseta o estado de edição/criação
+    const handleToggleForm = () => {
+        setIsFormVisible(prev => {
+            if (prev) {
+                setContinenteToEdit(null);
+                setFormData(INITIAL_FORM_DATA);
+            }
+            return !prev;
+        });
     };
 
+    // Lógica de filtro
+    const filteredContinentes = continentes.filter(cont => 
+        cont.nome.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
     return (
-        <div className='conteudo_continentes'>
-            <h1 className='text-xl font-bold mb-4'>🌍 Gerenciamento de Continentes</h1>
+        <div className="conteudo_continentes">
+            <div className='inicio_continentes'>
+                <h1 className='titulo_continentes'>Gerenciamento de Continentes</h1>
+                <p className='subtitulo_continentes'>Cadastre, edite e visualize informações completas sobre todos os continentes que desejar.</p>
+            </div>
             
-            {/* Bloco do Botão e Formulário (INALTERADO) */}
             <button
                 className="w-full py-3 mb-6 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition duration-300"
-                onClick={() => setIsFormVisible(!isFormVisible)}
+                onClick={handleToggleForm}
             >
-                {isFormVisible ? 'Cancelar' : '➕ Adicionar Novo Continente'}
+                {isFormVisible 
+                    ? 'Cancelar' 
+                    : continenteToEdit ? 'Editar Continente Selecionado' : '➕ Adicionar Novo Continente'
+                }
             </button>
             
             {isFormVisible && (
-                <div className="form-container p-6 border border-gray-300 rounded-lg mb-6">
-                    <h2 className="text-lg font-semibold mb-4">Novo Continente</h2>
-                    <form onSubmit={handleSubmit}>
-                        {/* ... campos do formulário (omitidos para brevidade) ... */}
-                        
-                        {/* Campo Nome */}
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium mb-1" htmlFor="nome">Nome *</label>
-                            <input type="text" id="nome" name="nome" value={novoContinente.nome} onChange={handleInputChange} className="w-full p-2 border border-gray-300 rounded" required/>
-                        </div>
-                        {/* Campo Descrição */}
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium mb-1" htmlFor="descricao">Descrição *</label>
-                            <textarea id="descricao" name="descricao" rows={3} value={novoContinente.descricao} onChange={handleInputChange} className="w-full p-2 border border-gray-300 rounded" required/>
-                        </div>
-                        {/* Campos Opcionais */}
-                        <div className="grid grid-cols-3 gap-4 mb-4">
-                            <div>
-                                <label className="block text-sm font-medium mb-1" htmlFor="area_km2">Área (km²)</label>
-                                <input type="number" id="area_km2" name="area_km2" value={novoContinente.area_km2 === undefined ? '' : novoContinente.area_km2} onChange={handleInputChange} className="w-full p-2 border border-gray-300 rounded"/>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-1" htmlFor="numero_paises">Nº Países</label>
-                                <input type="number" id="numero_paises" name="numero_paises" value={novoContinente.numero_paises === undefined ? '' : novoContinente.numero_paises} onChange={handleInputChange} className="w-full p-2 border border-gray-300 rounded"/>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-1" htmlFor="populacao_total">População Total</label>
-                                <input type="text" id="populacao_total" name="populacao_total" value={novoContinente.populacao_total || ''} onChange={handleInputChange} className="w-full p-2 border border-gray-300 rounded"/>
-                            </div>
-                        </div>
+                <form onSubmit={handleSubmit} className="p-6 bg-white rounded-lg shadow-xl mb-6 border border-gray-200">
+                    <h2 className="text-xl font-bold mb-4">
+                        {continenteToEdit ? `Editar ${continenteToEdit.nome}` : 'Cadastrar Novo Continente'}
+                    </h2>
 
-                        <div className="flex justify-end space-x-2">
-                            <button type="button" className="py-2 px-4 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition" onClick={() => setIsFormVisible(false)}>Cancelar</button>
-                            <button type="submit" className="py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">Criar Continente</button>
+                    <div className="mb-4">
+                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="nome">Nome *</label>
+                        <input type="text" id="nome" name="nome" value={formData.nome} onChange={handleInputChange} required className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" />
+                    </div>
+
+                    <div className="mb-4">
+                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="descricao">Descrição *</label>
+                        <textarea id="descricao" name="descricao" value={formData.descricao} onChange={handleInputChange} required rows={3} className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"></textarea>
+                    </div>
+
+                    {['area_km2', 'numero_paises', 'populacao_total'].map(field => (
+                        <div className="mb-4" key={field}>
+                            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor={field}>
+                                {field.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')} (Opcional)
+                            </label>
+                            <input 
+                                type="number" 
+                                id={field} 
+                                name={field} 
+                                value={formData[field as keyof ContinenteFormData] ?? ''} 
+                                onChange={handleInputChange} 
+                                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                            />
                         </div>
-                    </form>
-                </div>
+                    ))}
+                    
+                    <div className="flex items-center justify-between">
+                        <button
+                            type="submit"
+                            className="w-full bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition duration-150"
+                        >
+                            {continenteToEdit ? 'Salvar Alterações' : 'Cadastrar Continente'}
+                        </button>
+                    </div>
+                </form>
             )}
             
-            {/* 5. SEÇÃO DE LISTAGEM */}
             <h2 className="text-2xl font-semibold mb-4 text-gray-800">Lista de Continentes</h2>
+            <SearchBar 
+                searchQuery={searchQuery} 
+                onSearchChange={setSearchQuery} 
+            />
 
-            {isLoading && <p className='text-blue-500'>Carregando continentes...</p>}
-            
-            {!isLoading && continentes.length === 0 && (
+            {!isLoading && filteredContinentes.length === 0 && searchQuery.length > 0 && (
                 <p className='text-gray-500 p-4 bg-yellow-50 rounded-lg border border-yellow-200'>
-                    Nenhum continente cadastrado ainda.
+                    Nenhum continente encontrado com o termo "{searchQuery}".
                 </p>
             )}
-
-            {!isLoading && continentes.length > 0 && (
+            
+            {!isLoading && filteredContinentes.length > 0 && (
                 <div className="overflow-x-auto shadow-lg rounded-lg">
                     <table className="min-w-full bg-white">
                         <thead className="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
@@ -187,7 +272,7 @@ export default function ContinentesPage() {
                             </tr>
                         </thead>
                         <tbody className="text-gray-600 text-sm font-light">
-                            {continentes.map((cont) => (
+                            {filteredContinentes.map((cont) => (
                                 <tr key={cont.id} className="border-b border-gray-200 hover:bg-gray-100">
                                     <td className="py-3 px-6 text-left whitespace-nowrap">{cont.id}</td>
                                     <td className="py-3 px-6 text-left">{cont.nome}</td>
@@ -195,9 +280,18 @@ export default function ContinentesPage() {
                                     <td className="py-3 px-6 text-right">{formatNumber(cont.area_km2)}</td>
                                     <td className="py-3 px-6 text-right">{formatNumber(cont.populacao_total)}</td>
                                     <td className="py-3 px-6 text-center">
-                                        {/* TODO: Futuros botões de Editar e Excluir */}
-                                        <button className="text-blue-600 hover:text-blue-800 mx-1">Editar</button>
-                                        <button className="text-red-600 hover:text-red-800 mx-1">Excluir</button>
+                                        <button 
+                                            onClick={() => handleEditClick(cont)}
+                                            className="text-blue-600 hover:text-blue-800 mx-1 transition duration-150"
+                                        >
+                                            Editar
+                                        </button>
+                                        <button 
+                                            onClick={() => handleDelete(cont.id, cont.nome)}
+                                            className="text-red-600 hover:text-red-800 mx-1 transition duration-150"
+                                        >
+                                            Excluir
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
@@ -206,5 +300,5 @@ export default function ContinentesPage() {
                 </div>
             )}
         </div>
-    )
+    );
 }

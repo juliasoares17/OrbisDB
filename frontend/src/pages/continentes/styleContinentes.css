@@ -1,3 +1,19 @@
 .conteudo_continentes {
     margin-top: 13rem;
 }
+
+.inicio_continentes{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.titulo_continentes{
+    color:white;
+    text-align: center;
+}
+
+.subtitulo_continentes{
+    color: white;
+    text-align: center;
+}

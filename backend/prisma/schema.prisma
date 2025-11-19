@@ -31,6 +31,10 @@ model pais {
   moeda           String    @db.VarChar(50)
   created_at      DateTime? @default(now())
   updated_at      DateTime? @updatedAt
+  foto_url        String?   @db.VarChar(255)
+  foto_descricao  String?   @db.VarChar(255)
+  fotografo_nome  String?   @db.VarChar(100)
+  fotografo_perfil String?  @db.VarChar(255)
 
   continente continente @relation(fields: [id_continente], references: [id], onDelete: Cascade)
 
@@ -48,6 +52,10 @@ model cidade {
   longitude       Decimal   @db.Decimal(11, 8)
   created_at      DateTime? @default(now())
   updated_at      DateTime? @updatedAt
+  foto_url        String?   @db.VarChar(255)
+  foto_descricao  String?   @db.VarChar(255)
+  fotografo_nome  String?   @db.VarChar(100)
+  fotografo_perfil String?  @db.VarChar(255)
 
   pais pais @relation(fields: [id_pais], references: [id], onDelete: Cascade)
 
